@@ -24,10 +24,11 @@ import javax.annotation.Nullable;
  * @author graemerocher
  * @since 1.0
  */
-public interface ParameterElement extends Element {
+public interface ParameterElement extends TypedElement {
 
     /**
      * @return The type of the parameter
      */
+    @Override
     @Nullable ClassElement getType();
 }

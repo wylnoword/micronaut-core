@@ -87,6 +87,7 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -247,10 +248,13 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                                 pipeline.addLast(new LoggingHandler(logLevel))
                         );
 
-                        pipeline.addLast(new IdleStateHandler(
-                            (int) serverConfiguration.getReadIdleTime().getSeconds(),
-                            (int) serverConfiguration.getWriteIdleTime().getSeconds(),
-                            (int) serverConfiguration.getIdleTime().getSeconds()));
+                        final Duration idleTime = serverConfiguration.getIdleTimeout();
+                        if (!idleTime.isNegative()) {
+                            pipeline.addLast(new IdleStateHandler(
+                                    (int) serverConfiguration.getReadIdleTimeout().getSeconds(),
+                                    (int) serverConfiguration.getWriteIdleTimeout().getSeconds(),
+                                    (int) idleTime.getSeconds()));
+                        }
 
                         pipeline.addLast(HTTP_CODEC, new HttpServerCodec(
                                 serverConfiguration.getMaxInitialLineLength(),
@@ -337,7 +341,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
 
     @Override
     public String getHost() {
-        return serverConfiguration.getHost().orElse("localhost");
+        return serverConfiguration.getHost()
+                    .orElseGet(() -> Optional.ofNullable(System.getenv(Environment.HOSTNAME)).orElse(SocketUtils.LOCALHOST));
     }
 
     @Override
@@ -403,9 +408,17 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         if (!SocketUtils.isTcpPortAvailable(serverPort) && !isRandomPort) {
             throw new ServerStartupException("Unable to start Micronaut server on port: " + serverPort, new BindException("Address already in use"));
         }
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("Binding server to port: {}", serverPort);
+        Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
+        if (applicationName.isPresent()) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Binding {} server to {}:{}", applicationName.get(), host != null ? host : "*", serverPort);
+            }
+        } else {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Binding server to {}:{}", host != null ? host : "*", serverPort);
+            }
         }
+
         try {
             if (host != null) {
                 serverBootstrap.bind(host, serverPort).sync();
@@ -414,7 +427,6 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             }
 
             applicationContext.publishEvent(new ServerStartupEvent(this));
-            Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
             applicationName.ifPresent(id -> {
                 this.serviceInstance = applicationContext.createBean(NettyEmbeddedServerInstance.class, id, this);
                 applicationContext.publishEvent(new ServiceStartedEvent(serviceInstance));

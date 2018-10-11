@@ -34,8 +34,8 @@ dependencies {
     testCompile project(":aop")
     testCompile project(":runtime")
     testCompile dependencyVersion("rxjava2")
-    testCompile "org.hibernate:hibernate-core:5.1.5.Final"
-    testCompile 'org.hibernate:hibernate-validator:5.4.1.Final'
+    testCompile "org.hibernate:hibernate-core:5.3.6.Final"
+    testCompile 'org.hibernate:hibernate-validator:6.0.13.Final'
     testRuntime 'org.glassfish.web:el-impl:2.2.1-b05'
     testCompile "junit:junit:4.7"
     testCompile "com.google.testing.compile:compile-testing:0.12"
@@ -43,6 +43,7 @@ dependencies {
     testCompile 'org.neo4j.driver:neo4j-java-driver:1.4.5'
     testCompile dependencyModuleVersion("groovy", "groovy-json")
     testCompile files(org.gradle.internal.jvm.Jvm.current().toolsJar)
+    testRuntime 'org.glassfish:javax.el:3.0.1-b08'
 }
 
 

@@ -20,8 +20,6 @@ import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.security.token.jwt.encryption.EncryptionConfiguration;
 
-import javax.inject.Singleton;
-
 /**
  * Creates {@link EncryptionConfiguration} for each {@link SecretEncryptionConfiguration} bean.
  * @author Sergio del Amo
@@ -36,7 +34,6 @@ public class SecretEncryptionFactory {
      * @return The {@link EncryptionConfiguration}
      */
     @EachBean(SecretEncryptionConfiguration.class)
-    @Singleton
     public EncryptionConfiguration encryptionConfiguration(SecretEncryptionConfiguration configuration) {
         return new SecretEncryption(configuration);
     }

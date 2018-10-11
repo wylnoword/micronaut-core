@@ -20,9 +20,9 @@ import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.security.token.jwt.signature.SignatureConfiguration;
 
-import javax.inject.Singleton;
-
 /**
+ * Creates {@link SignatureConfiguration} for each {@link RSASignatureConfiguration} bean.
+ *
  * @author Sergio del Amo
  * @since 1.0
  */
@@ -36,7 +36,6 @@ public class RSASignatureFactory {
      * @return The {@link SignatureConfiguration}
      */
     @EachBean(RSASignatureConfiguration.class)
-    @Singleton
     public SignatureConfiguration signatureConfiguration(RSASignatureConfiguration configuration) {
         return new RSASignature(configuration);
     }

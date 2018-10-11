@@ -18,7 +18,9 @@ package io.micronaut.cli.profile.commands
 
 import groovy.transform.CompileStatic
 import io.micronaut.cli.MicronautCli
+import io.micronaut.cli.console.logging.MicronautConsole
 import io.micronaut.cli.profile.ExecutionContext
+import io.micronaut.cli.util.NameUtils
 import io.micronaut.cli.util.VersionInfo
 import picocli.CommandLine.Command
 import picocli.CommandLine.Option
@@ -51,6 +53,7 @@ abstract class AbstractCreateAppCommand extends AbstractCreateCommand {
 
         Set<String> selectedFeatures = new HashSet<>()
         selectedFeatures.addAll(features)
+
 
         CreateServiceCommandObject cmd = new CreateServiceCommandObject(
                 appName: this.nameOfAppToCreate,

@@ -19,10 +19,12 @@ package io.micronaut.security.token.jwt.signature.secret;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.security.token.jwt.signature.SignatureConfiguration;
-
-import javax.inject.Singleton;
+import io.micronaut.security.token.jwt.signature.SignatureGeneratorConfiguration;
+import io.micronaut.security.token.jwt.signature.rsa.RSASignatureConfiguration;
 
 /**
+ * Creates {@link SignatureConfiguration} and {@link SignatureGeneratorConfiguration} for each {@link SecretSignatureConfiguration} beans.
+ *
  * @author Sergio del Amo
  * @since 1.0
  */
@@ -36,8 +38,18 @@ public class SecretSignatureFactory {
      * @return The {@link SignatureConfiguration}
      */
     @EachBean(SecretSignatureConfiguration.class)
-    @Singleton
     public SignatureConfiguration signatureConfiguration(SecretSignatureConfiguration configuration) {
+        return new SecretSignature(configuration);
+    }
+
+    /**
+     * Creates {@link SignatureGeneratorConfiguration} for each {@link SecretSignatureConfiguration} bean.
+     *
+     * @param configuration {@link SecretSignatureConfiguration} bean.
+     * @return The {@link SignatureGeneratorConfiguration}
+     */
+    @EachBean(SecretSignatureConfiguration.class)
+    public SignatureGeneratorConfiguration signatureGeneratorConfiguration(SecretSignatureConfiguration configuration) {
         return new SecretSignature(configuration);
     }
 }

@@ -763,10 +763,12 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         pipeline.remove(readTimeoutHandler);
                     }
 
-                    Optional<Duration> readIdleTime = configuration.getReadIdleTime();
+                    Optional<Duration> readIdleTime = configuration.getReadIdleTimeout();
                     if (readIdleTime.isPresent()) {
                         Duration duration = readIdleTime.get();
-                        pipeline.addLast(HANDLER_IDLE_STATE, new IdleStateHandler(duration.toMillis(), duration.toMillis(), duration.toMillis(), TimeUnit.MILLISECONDS));
+                        if (!duration.isNegative()) {
+                            pipeline.addLast(HANDLER_IDLE_STATE, new IdleStateHandler(duration.toMillis(), duration.toMillis(), duration.toMillis(), TimeUnit.MILLISECONDS));
+                        }
                     }
 
                     final NettyWebSocketClientHandler webSocketHandler;
@@ -2018,10 +2020,12 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     }
                 });
             } else {
-                Optional<Duration> readIdleTime = configuration.getReadIdleTime();
+                Optional<Duration> readIdleTime = configuration.getReadIdleTimeout();
                 if (readIdleTime.isPresent()) {
                     Duration duration = readIdleTime.get();
-                    p.addLast(HANDLER_IDLE_STATE, new IdleStateHandler(duration.toMillis(), duration.toMillis(), duration.toMillis(), TimeUnit.MILLISECONDS));
+                    if (!duration.isNegative()) {
+                        p.addLast(HANDLER_IDLE_STATE, new IdleStateHandler(duration.toMillis(), duration.toMillis(), duration.toMillis(), TimeUnit.MILLISECONDS));
+                    }
                 }
             }
             p.addLast(HANDLER_HTTP_CLIENT_CODEC, new HttpClientCodec());
@@ -2094,7 +2098,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
                     if (evt instanceof IdleStateEvent) {
                         // close the connection if it is idle for too long
-                        close(ctx, ctx.voidPromise());
+                        ctx.close();
                     } else {
                         super.userEventTriggered(ctx, evt);
                     }

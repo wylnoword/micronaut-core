@@ -26,6 +26,7 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.*;
 import io.micronaut.http.uri.UriMatchTemplate;
@@ -81,6 +82,15 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
         }
 
         httpMethodOpt.ifPresent(httpMethodClass -> {
+            HttpMethod httpMethod = null;
+            try {
+                httpMethod = HttpMethod.valueOf(httpMethodClass.getSimpleName().toUpperCase(Locale.ENGLISH));
+            } catch (IllegalArgumentException e) {
+                // ignore
+            }
+            if (httpMethod == null) {
+                return;
+            }
 
             UriMatchTemplate matchTemplate = UriMatchTemplate.of(element.getValue(Controller.class, String.class).orElse("/"));
             matchTemplate = matchTemplate.nest(element.getValue(HttpMethodMapping.class, String.class).orElse("/"));
@@ -111,7 +121,6 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
 
             readCallbacks(element, context, swaggerOperation);
 
-            HttpMethod httpMethod = HttpMethod.valueOf(httpMethodClass.getSimpleName().toUpperCase(Locale.ENGLISH));
             JavadocDescription javadocDescription = element.getDocumentation().map(s -> new JavadocParser().parse(s)).orElse(null);
 
             if (javadocDescription != null && StringUtils.isEmpty(swaggerOperation.getDescription())) {
@@ -153,9 +162,12 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                 }
 
                 ClassElement returnType = element.getReturnType();
+                if (returnType.isAssignable(HttpResponse.class)) {
+                    returnType = returnType.getFirstTypeArgument().orElse(returnType);
+                }
                 if (returnType != null) {
                     String mediaType = element.getValue(Produces.class, String.class).orElse(MediaType.APPLICATION_JSON);
-                    Content content = buildContent(returnType, mediaType, openAPI, context);
+                    Content content = buildContent(element, returnType, mediaType, openAPI, context);
                     okResponse.setContent(content);
                 }
                 responses.put(ApiResponses.DEFAULT, okResponse);
@@ -189,7 +201,12 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                         }
                         requestBody.setRequired(!parameter.isAnnotationPresent(Nullable.class) && !parameterType.isAssignable(Optional.class));
 
-                        Content content = buildContent(parameterType, consumesMediaType, openAPI, context);
+                        Content content = buildContent(
+                                parameter,
+                                parameterType,
+                                consumesMediaType,
+                                openAPI, context
+                        );
                         requestBody.setContent(content);
                         swaggerOperation.setRequestBody(requestBody);
                     }
@@ -292,7 +309,7 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
 
                     Schema schema = newParameter.getSchema();
                     if (schema == null) {
-                        schema = resolveSchema(openAPI, parameterType, context, consumesMediaType);
+                        schema = resolveSchema(openAPI, parameter, parameterType, context, consumesMediaType);
                     }
 
                     if (schema != null) {
@@ -314,7 +331,7 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                         if (parameter.isAnnotationPresent(JsonIgnore.class) || parameter.isAnnotationPresent(Hidden.class)) {
                             continue;
                         }
-                        Schema propertySchema = resolveSchema(openAPI, parameter.getType(), context, consumesMediaType);
+                        Schema propertySchema = resolveSchema(openAPI, parameter, parameter.getType(), context, consumesMediaType);
 
                         processSchemaProperty(context, parameter, parameter.getType(), schema, propertySchema);
 
@@ -493,10 +510,10 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
         }
     }
 
-    private Content buildContent(ClassElement type, String mediaType, OpenAPI openAPI, VisitorContext context) {
+    private Content buildContent(Element definingElement, ClassElement type, String mediaType, OpenAPI openAPI, VisitorContext context) {
         Content content = new Content();
         io.swagger.v3.oas.models.media.MediaType mt = new io.swagger.v3.oas.models.media.MediaType();
-        mt.setSchema(resolveSchema(openAPI, type, context, mediaType));
+        mt.setSchema(resolveSchema(openAPI,definingElement, type, context, mediaType));
         content.addMediaType(mediaType, mt);
         return content;
     }

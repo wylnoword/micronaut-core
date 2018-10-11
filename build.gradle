@@ -54,7 +54,8 @@ ext {
             jackson: [
                 version: jacksonVersion,
                 group:'com.fasterxml.jackson.core',
-                name:'jackson-databind'
+                name:'jackson-databind',
+                modules:['jackson-core', 'jackson-annotations']
             ],
             'jackson.modules': [
                     version: jacksonVersion,
@@ -71,6 +72,16 @@ ext {
                     version: jaegerVersion,
                     group:'io.jaegertracing',
                     name:'jaeger-thrift'
+            ],
+            'zipkin.reporter': [
+                    version: zipkinReporterVersion,
+                    group:'io.zipkin.reporter2',
+                    name:'zipkin-reporter'
+            ],
+            'brave.instrumentation': [
+                    version: braveInstrumentationHttpVersion,
+                    group:'io.zipkin.brave',
+                    name:'brave-instrumentation-http'
             ],
             'javax.annotation-api': [
                     version: javaxAnnotationApiVersion,
@@ -322,7 +333,10 @@ subprojects { Project subproject ->
         targetCompatibility = '1.8'
 //        compileJava.options.compilerArgs.add '-parameters'
 //        compileTestJava.options.compilerArgs.add '-parameters'
-        if(!subproject.name.contains('test-suite') && !subproject.toString().contains('build-projects')) {
+        if(
+            !subproject.name.startsWith('test-') && 
+            !subproject.toString().contains('build-projects')
+        ) {
             apply from:"${rootProject.rootDir}/gradle/publishing.gradle"
             apply plugin: 'checkstyle'
             
@@ -344,6 +358,8 @@ subprojects { Project subproject ->
     jar {
         manifest {
             attributes('Automatic-Module-Name': "${subproject.group}.${subproject.name}".replaceAll('[^\\w\\.\\$_]', "_"))
+            attributes('Implementation-Version': projectVersion)
+            attributes('Implementation-Title': 'Micronaut')
         }
     }
 

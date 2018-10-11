@@ -24,6 +24,23 @@ import spock.lang.Unroll
  * @since 1.0
  */
 class NameUtilsSpec extends Specification {
+
+    @Unroll
+    void "test is valid service ID #name"() {
+        expect:
+        NameUtils.isHyphenatedLowerCase(name) == result
+
+        where:
+        name        | result
+        "foo-bar"   | true
+        "foobar"    | true
+        "foo1-bar"  | true
+        "Foo-bar"   | false
+        "foo1-bar"  | true
+        "1foo1-bar" | false
+        "Foo1Bar"   | false
+    }
+
     void "test simple name"() {
         expect:
         NameUtils.getSimpleName(value) == result
@@ -53,15 +70,22 @@ class NameUtilsSpec extends Specification {
         NameUtils.hyphenate(value) == result
 
         where:
-        value                             | result
-        'micronaut.config-client.enabled' | 'micronaut.config-client.enabled'
-        "com.fooBar.FooBar"               | "com.foo-bar.foo-bar"
-        "FooBar"                          | "foo-bar"
-        "com.bar.FooBar"                  | "com.bar.foo-bar"
-        "Foo"                             | 'foo'
-        "FooBBar"                         | 'foo-bbar'
-        "FOO_BAR"                         | 'foo-bar'
-        "fooBBar"                         | 'foo-bbar'
+        value                                       | result
+        'gr8crm-notification-service'.toUpperCase() | 'gr8crm-notification-service'
+        'gr8-notification-service'.toUpperCase()    | 'gr8-notification-service'
+        '8gr8-notification-service'.toUpperCase()   | '8gr8-notification-service'
+        '8gr8-notification-s3rv1c3'.toUpperCase()   | '8gr8-notification-s3rv1c3'
+        'gr8-7notification-service'.toUpperCase()   | 'gr8-7notification-service'
+        'micronaut.config-client.enabled'           | 'micronaut.config-client.enabled'
+        "com.fooBar.FooBar"                         | "com.foo-bar.foo-bar"
+        "FooBar"                                    | "foo-bar"
+        "com.bar.FooBar"                            | "com.bar.foo-bar"
+        "Foo"                                       | 'foo'
+        "FooBBar"                                   | 'foo-bbar'
+        "FOO_BAR"                                   | 'foo-bar'
+        "fooBBar"                                   | 'foo-bbar'
+        'gr8crm-notification-service'               | 'gr8crm-notification-service'
+
     }
 
     @Unroll
@@ -174,12 +198,12 @@ class NameUtilsSpec extends Specification {
         NameUtils.isGetterName(name) == getter
 
         where:
-        name                       | getter
-        "foo"                      | false
-        "isFoo"                    | true
-        "isfoo"                    | false
-        "getFoo"                   | true
-        "getfoo"                   | false
-        "a"                        | false
+        name     | getter
+        "foo"    | false
+        "isFoo"  | true
+        "isfoo"  | false
+        "getFoo" | true
+        "getfoo" | false
+        "a"      | false
     }
 }

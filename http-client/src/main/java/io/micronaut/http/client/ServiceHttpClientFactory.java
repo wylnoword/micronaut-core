@@ -19,10 +19,10 @@ package io.micronaut.http.client;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.ServiceInstanceList;
-import io.micronaut.health.HealthStatus;
+import io.micronaut.discovery.StaticServiceInstanceList;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -34,7 +34,6 @@ import io.reactivex.Flowable;
 import java.net.URI;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.stream.Collectors;
 
 /**
  * Creates {@link HttpClient} instances for each defined {@link ServiceHttpClientConfiguration}.
@@ -66,32 +65,34 @@ public class ServiceHttpClientFactory {
     }
 
     /**
+     * Create a {@link ServiceInstanceList} for each configured client.
+     *
+     * @param configuration The configuration
+     * @return The instance list
+     */
+    @EachBean(ServiceHttpClientConfiguration.class)
+    @Requires(condition = ServiceHttpClientCondition.class)
+    StaticServiceInstanceList serviceInstanceList(ServiceHttpClientConfiguration configuration) {
+        List<URI> originalURLs = configuration.getUrls();
+        Collection<URI> loadBalancedURIs = new ConcurrentLinkedQueue<>(originalURLs);
+        return new StaticServiceInstanceList(configuration.getServiceId(), loadBalancedURIs);
+    };
+
+    /**
      * Creates {@link HttpClient} instances for each defined {@link ServiceHttpClientConfiguration}.
      * @param configuration The configuration
+     * @param instanceList The instance list
      * @return The client bean
      */
     @EachBean(ServiceHttpClientConfiguration.class)
     @Requires(condition = ServiceHttpClientCondition.class)
-    DefaultHttpClient serviceHttpClient(ServiceHttpClientConfiguration configuration) {
+    DefaultHttpClient serviceHttpClient(
+            @Parameter ServiceHttpClientConfiguration configuration,
+            @Parameter StaticServiceInstanceList instanceList) {
         List<URI> originalURLs = configuration.getUrls();
-        Collection<URI> loadBalancedURIs = new ConcurrentLinkedQueue<>(originalURLs);
+        Collection<URI> loadBalancedURIs = instanceList.getLoadBalancedURIs();
         boolean isHealthCheck = configuration.isHealthCheck();
 
-        ServiceInstanceList instanceList = new ServiceInstanceList() {
-            @Override
-            public String getID() {
-                return configuration.getServiceId();
-            }
-
-            @Override
-            public List<ServiceInstance> getInstances() {
-                return loadBalancedURIs.stream().map(url -> {
-                    ServiceInstance.Builder builder = ServiceInstance.builder(configuration.getServiceId(), url);
-                    builder.status(HealthStatus.UP);
-                    return builder.build();
-                }).collect(Collectors.toList());
-            }
-        };
         LoadBalancer loadBalancer = loadBalancerFactory.create(instanceList);
 
         Optional<String> path = configuration.getPath();

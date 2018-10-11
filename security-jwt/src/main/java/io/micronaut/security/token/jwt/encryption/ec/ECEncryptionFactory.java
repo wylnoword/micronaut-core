@@ -20,8 +20,6 @@ import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.security.token.jwt.encryption.EncryptionConfiguration;
 
-import javax.inject.Singleton;
-
 /**
  * Creates {@link EncryptionConfiguration} for each {@link ECEncryptionConfiguration} bean.
  *
@@ -37,7 +35,6 @@ public class ECEncryptionFactory {
      * @return The {@link EncryptionConfiguration}
      */
     @EachBean(ECEncryptionConfiguration.class)
-    @Singleton
     public EncryptionConfiguration encryptionConfiguration(ECEncryptionConfiguration configuration) {
         return new ECEncryption(configuration);
     }

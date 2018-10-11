@@ -387,6 +387,10 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
             MicronautConsole.instance.error("Profile not found for name [$profileName]")
             return false
         }
+        if (profileInstance.isAbstract()) {
+            MicronautConsole.instance.error("Profile [$profileName] is designed only for extension and not direct usage")
+            return false
+        }
         return true
     }
 
@@ -699,6 +703,13 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
 
         try {
             defaultpackagename = establishGroupAndAppName(groupAndAppName)
+
+            if (!NameUtils.isValidServiceId(appname)) {
+                MicronautConsole.instance.error("Application name should be all lower case and separated by underscores. For example: hello-world")
+                return false
+            } else {
+                return true
+            }
         } catch (IllegalArgumentException e) {
             MicronautConsole.instance.error(e.message)
             return false
@@ -735,6 +746,7 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
             groupname = parts[0..-2].join('.')
             defaultPackage = groupname
         }
+
         return defaultPackage
     }
 
