@@ -20,6 +20,8 @@ import groovy.transform.CompileDynamic
 import groovy.transform.CompileStatic
 import groovy.transform.TypeCheckingMode
 import io.micronaut.cli.MicronautCli
+import io.micronaut.cli.config.features.AbstractFeature
+import io.micronaut.cli.config.profiles.AbstractProfile
 import io.micronaut.cli.console.logging.ConsoleAntBuilder
 import io.micronaut.cli.console.logging.MicronautConsole
 import io.micronaut.cli.io.IOUtils
@@ -57,6 +59,9 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
     protected static final String BUILD_GRADLE = "build.gradle"
     protected static final String POM_XML = "pom.xml"
 
+    private ServiceLoader<AbstractProfile> profileServiceLoader
+    private ServiceLoader<AbstractFeature> featureServiceLoader
+
     ProfileRepository profileRepository
     Map<String, String> variables = [:]
 
@@ -77,7 +82,10 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
     String defaultpackagename
     File targetDirectory
 
-    AbstractCreateCommand() {}
+    AbstractCreateCommand() {
+        profileServiceLoader = ServiceLoader.load(AbstractProfile)
+        featureServiceLoader = ServiceLoader.load(AbstractFeature)
+    }
 
     abstract String getName();
 
@@ -269,7 +277,16 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
 
         String profileName = cmd.profileName
 
-        Profile profileInstance = profileRepository.getProfile(profileName)
+        //TODO: load the profiles via service loader, pass in the state object
+        //TODO: state object will return an instance of Profile.java (maybe)
+
+
+
+        Profile profileInstance = profileServiceLoader.iterator().find { it.name == profileName }
+
+
+
+        //profileRepository.getProfile(profileName)
         if (!validateProfile(profileInstance, profileName)) {
             return false
         }
@@ -496,6 +513,8 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
 
     @CompileStatic(TypeCheckingMode.SKIP)
     protected static Iterable<Feature> evaluateFeatures(Profile profile, Set<String> requestedFeatures, String lang) {
+
+        //TODO: Decide what logic belongs within the feature vs within the CLI
 
         def (Set<Feature> features, List<String> validRequestedFeatureNames) = populateFeatures(profile, requestedFeatures, lang)
         features = addDependentFeatures(profile, features)
