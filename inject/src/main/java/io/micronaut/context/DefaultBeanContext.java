@@ -32,7 +32,8 @@ import io.micronaut.core.async.subscriber.Completable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
-import io.micronaut.core.io.service.StreamSoftServiceLoader;
+import io.micronaut.core.io.service.ServiceDefinition;
+import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
@@ -914,6 +915,9 @@ public class DefaultBeanContext implements BeanContext {
                 EVENT_LOGGER.debug("Publishing event: {}", event);
             }
             Collection<ApplicationEventListener> eventListeners = getBeansOfType(ApplicationEventListener.class, Qualifiers.byTypeArguments(event.getClass()));
+
+            eventListeners = eventListeners.stream().sorted(OrderUtil.COMPARATOR).collect(Collectors.toList());
+
             if (!eventListeners.isEmpty()) {
                 if (EVENT_LOGGER.isTraceEnabled()) {
                     EVENT_LOGGER.trace("Established event listeners {} for event: {}", eventListeners, event);
@@ -981,7 +985,14 @@ public class DefaultBeanContext implements BeanContext {
      * @return The bean definition classes
      */
     protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
-        return StreamSoftServiceLoader.loadPresentParallel(BeanDefinitionReference.class, classLoader).collect(Collectors.toList());
+        final SoftServiceLoader<BeanDefinitionReference> definitions = SoftServiceLoader.load(BeanDefinitionReference.class, classLoader);
+        List<BeanDefinitionReference> list = new ArrayList<>(300);
+        for (ServiceDefinition<BeanDefinitionReference> definition : definitions) {
+            if (definition.isPresent()) {
+                list.add(definition.load());
+            }
+        }
+        return list;
     }
 
     /**
@@ -1098,6 +1109,16 @@ public class DefaultBeanContext implements BeanContext {
             }
         }
 
+        final Runnable runnable = () ->
+                beanDefinitionsClasses.removeIf((BeanDefinitionReference beanDefinitionReference) ->
+                        !beanDefinitionReference.isEnabled(this));
+        if (ClassLoadingReporter.isReportingEnabled()) {
+            // do this in a blocking manner so that reporting is immediately aware of missing classes
+            runnable.run();
+        } else {
+            // proactively remove bean definitions that are not enabled
+            new Thread(runnable).start();
+        }
 
     }
 
@@ -1122,8 +1143,11 @@ public class DefaultBeanContext implements BeanContext {
             Stream<BeanDefinition<T>> candidateStream = beanDefinitionsClasses
                     .stream()
                     .filter(reference -> {
-                        Class<?> candidateType = reference.getBeanType();
-                        return candidateType != null && (beanType.isAssignableFrom(candidateType) || beanType == candidateType);
+                        if (reference.isEnabled(this)) {
+                            Class<?> candidateType = reference.getBeanType();
+                            return candidateType != null && (beanType.isAssignableFrom(candidateType) || beanType == candidateType);
+                        }
+                        return false;
                     })
                     .map(ref -> {
                         BeanDefinition<T> loadedBean;
@@ -1178,9 +1202,13 @@ public class DefaultBeanContext implements BeanContext {
                 List<BeanDefinition> candidates = beanDefinitionsClasses
                         .stream()
                         .filter(reference -> {
-                            Class<?> candidateType = reference.getBeanType();
+                            if (reference.isEnabled(this)) {
+                                Class<?> candidateType = reference.getBeanType();
 
-                            return candidateType != null && candidateType.isInstance(instance);
+                                return candidateType != null && candidateType.isInstance(instance);
+                            } else {
+                                return false;
+                            }
                         })
                         .map(ref -> ref.load(this))
                         .filter(candidate -> candidate.isEnabled(this))
@@ -1474,25 +1502,27 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     private void loadContextScopeBean(BeanDefinitionReference contextScopeBean) {
-        BeanDefinition beanDefinition = contextScopeBean.load(this);
-        if (beanDefinition.isEnabled(this)) {
+        if (contextScopeBean.isEnabled(this)) {
+            BeanDefinition beanDefinition = contextScopeBean.load(this);
+            if (beanDefinition.isEnabled(this)) {
 
-            if (beanDefinition.isIterable()) {
-                Collection<BeanDefinition> beanCandidates = findBeanCandidates(beanDefinition.getBeanType(), null);
-                for (BeanDefinition beanCandidate : beanCandidates) {
-                    DefaultBeanResolutionContext resolutionContext = new DefaultBeanResolutionContext(this, beanDefinition);
+                if (beanDefinition.isIterable()) {
+                    Collection<BeanDefinition> beanCandidates = findBeanCandidates(beanDefinition.getBeanType(), null);
+                    for (BeanDefinition beanCandidate : beanCandidates) {
+                        DefaultBeanResolutionContext resolutionContext = new DefaultBeanResolutionContext(this, beanDefinition);
 
-                    createAndRegisterSingleton(
-                            resolutionContext,
-                            beanCandidate,
-                            beanCandidate.getBeanType(),
-                            null
-                    );
+                        createAndRegisterSingleton(
+                                resolutionContext,
+                                beanCandidate,
+                                beanCandidate.getBeanType(),
+                                null
+                        );
+                    }
+
+                } else {
+
+                    createAndRegisterSingleton(new DefaultBeanResolutionContext(this, beanDefinition), beanDefinition, beanDefinition.getBeanType(), null);
                 }
-
-            } else {
-
-                createAndRegisterSingleton(new DefaultBeanResolutionContext(this, beanDefinition), beanDefinition, beanDefinition.getBeanType(), null);
             }
         }
     }
@@ -1927,17 +1957,12 @@ public class DefaultBeanContext implements BeanContext {
     private void readAllBeanDefinitionClasses() {
         List<BeanDefinitionReference> contextScopeBeans = new ArrayList<>();
         List<BeanDefinitionReference> processedBeans = new ArrayList<>();
-        List<BeanDefinitionReference> beanDefinitionReferences = resolveBeanDefinitionReferences()
-                .stream()
-                .filter(beanDefinitionReference -> beanDefinitionReference.isEnabled(DefaultBeanContext.this)).collect(Collectors.toList());
+        List<BeanDefinitionReference> beanDefinitionReferences = resolveBeanDefinitionReferences();
         List<BeanDefinitionReference> allReferences = new ArrayList<>(beanDefinitionReferences.size());
 
         final boolean reportingEnabled = ClassLoadingReporter.isReportingEnabled();
         for (BeanDefinitionReference beanDefinitionReference : beanDefinitionReferences) {
             allReferences.add(beanDefinitionReference);
-            if (reportingEnabled) {
-                ClassLoadingReporter.reportPresent(beanDefinitionReference.getBeanType());
-            }
             if (beanDefinitionReference.isContextScope()) {
                 contextScopeBeans.add(beanDefinitionReference);
             }
@@ -1959,6 +1984,10 @@ public class DefaultBeanContext implements BeanContext {
                 }
                 contextScopeBeans.remove(beanDefinitionReference);
                 processedBeans.remove(beanDefinitionReference);
+                if (reportingEnabled) {
+                    ClassLoadingReporter.reportMissing(beanDefinitionReference.getBeanDefinitionName());
+                    ClassLoadingReporter.reportMissing(beanDefinitionReference.getName());
+                }
                 return true;
             }
 

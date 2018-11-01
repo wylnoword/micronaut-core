@@ -1752,7 +1752,13 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 } finally {
                     pipeline.remove(this);
                     if (fullResponse.refCnt() > 1) {
-                        ReferenceCountUtil.safeRelease(fullResponse);
+                        try {
+                            ReferenceCountUtil.release(fullResponse);
+                        } catch (Throwable e) {
+                            if (LOG.isDebugEnabled()) {
+                                LOG.debug("Failed to release response: {}", fullResponse);
+                            }
+                        }
                     }
                     if (channelPool != null) {
                         Channel ch = channelHandlerContext.channel();

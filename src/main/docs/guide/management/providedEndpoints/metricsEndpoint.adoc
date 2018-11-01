@@ -101,11 +101,11 @@ micronaut:
 ----
 dependencies {
     ...
-    compile "io.micronaut.configuration:micrometer-core"
+    compile "io.micronaut.configuration:micronaut-micrometer-core"
     // micrometer-registry-statsd also pulls in micrometer-core so included above to verbose example
-    compile "io.micronaut.configuration:micrometer-registry-statsd"
+    compile "io.micronaut.configuration:micronaut-micrometer-registry-statsd"
     // Also required to enable endpoint
-    compile "io.micronaut:management"
+    compile "io.micronaut:micronaut-management"
     ...
 }
 ----
@@ -115,19 +115,19 @@ dependencies {
 ----
 <dependency>
   <groupId>io.micronaut.configuration</groupId>
-  <artifactId>micrometer-core</artifactId>
+  <artifactId>micronaut-micrometer-core</artifactId>
   <version>${micronaut.version}</version>
 </dependency>
 <!-- micrometer-registry-statsd also pulls in micrometer-core so included above to verbose example -->
 <dependency>
   <groupId>io.micronaut.configuration</groupId>
-  <artifactId>micrometer-registry-statsd</artifactId>
+  <artifactId>micronaut-micrometer-registry-statsd</artifactId>
   <version>${micronaut.version}</version>
 </dependency>
 <!-- Also required to enable endpoint -->
 <dependency>
   <groupId>io.micronaut</groupId>
-  <artifactId>management</artifactId>
+  <artifactId>micronaut-management</artifactId>
   <version>${micronaut.version}</version>
 </dependency>
 ----
@@ -319,7 +319,7 @@ The data source metrics bindings will provide data source pool metrics.
 
 NOTE: There is a different set of pool metric names for HikariCP and other pool providers.
 
-If you are using `io.micronaut.configuration:jdbc-hikari` you will get additional pool metrics as HikariCP has built in support for meter registries.
+If you are using `io.micronaut.configuration:micronaut-jdbc-hikari` you will get additional pool metrics as HikariCP has built in support for meter registries.
 
 .HikariCP Metrics Provided
 |=======
@@ -336,7 +336,7 @@ If you are using `io.micronaut.configuration:jdbc-hikari` you will get additiona
 | hikaricp.connections.acquire
 |=======
 
-If you are using `io.micronaut.configuration:jdbc-tomcat` or `io.micronaut.configuration:jdbc-dbcp` you will get the following metrics
+If you are using `io.micronaut.configuration:micronaut-jdbc-tomcat` or `io.micronaut.configuration:micronaut-jdbc-dbcp` you will get the following metrics
 
 .Generic Pool Metrics provided
 |=======
@@ -365,14 +365,14 @@ By default there a metrics endpoint wired up and metrics are provided to it for 
 
 === Statsd Registry
 
-You can include the statsd reporter via `io.micronaut.configuration:micrometer-registry-statsd:${micronaut.version}`
+You can include the statsd reporter via `io.micronaut.configuration:micronaut-micrometer-registry-statsd:${micronaut.version}`
 
 .Maven
 [source,xml]
 ----
 <dependency>
   <groupId>io.micronaut.configuration</groupId>
-  <artifactId>micrometer-registry-statsd</artifactId>
+  <artifactId>micronaut-micrometer-registry-statsd</artifactId>
   <version>${micronaut.version}</version>
 </dependency>
 ----
@@ -405,14 +405,14 @@ micronaut:
 
 === Graphite Registry
 
-You can include the graphite reporter via `io.micronaut.configuration:micrometer-registry-graphite:${micronaut.version}`
+You can include the graphite reporter via `io.micronaut.configuration:micronaut-micrometer-registry-graphite:${micronaut.version}`
 
 .Maven
 [source,xml]
 ----
 <dependency>
   <groupId>io.micronaut.configuration</groupId>
-  <artifactId>micrometer-registry-graphite</artifactId>
+  <artifactId>micronaut-micrometer-registry-graphite</artifactId>
   <version>${micronaut.version}</version>
 </dependency>
 ----
@@ -443,14 +443,14 @@ micronaut:
 
 === Atlas Registry
 
-You can include the atlas reporter via `io.micronaut.configuration:micrometer-registry-atlas:${micronaut.version}`
+You can include the atlas reporter via `io.micronaut.configuration:micronaut-micrometer-registry-atlas:${micronaut.version}`
 
 .Maven
 [source,xml]
 ----
 <dependency>
   <groupId>io.micronaut.configuration</groupId>
-  <artifactId>micrometer-registry-atlas</artifactId>
+  <artifactId>micronaut-micrometer-registry-atlas</artifactId>
   <version>${micronaut.version}</version>
 </dependency>
 ----
@@ -479,14 +479,14 @@ micronaut:
 
 === Prometheus Registry
 
-You can include the prometheus reporter via `io.micronaut.configuration:micrometer-registry-prometheus:${micronaut.version}`
+You can include the prometheus reporter via `io.micronaut.configuration:micronaut-micrometer-registry-prometheus:${micronaut.version}`
 
 .Maven
 [source,xml]
 ----
 <dependency>
   <groupId>io.micronaut.configuration</groupId>
-  <artifactId>micrometer-registry-prometheus</artifactId>
+  <artifactId>micronaut-micrometer-registry-prometheus</artifactId>
   <version>${micronaut.version}</version>
 </dependency>
 ----

@@ -1,12 +1,10 @@
 Apart from https://github.com/micronaut-projects/micronaut-core/milestone/6?closed=1[issues resolved and minor enhancements] since the last release of Micronaut, this section covers significant new features.
 
-=== Improvements from RC1 to RC2
+=== Improvements from RC3 to GA
 
-The following changes and improvements were added since the last RC:
+GraalVM support has been updated to use Docker instead of a `./build-native-image` script allowing usage of other platforms.
 
-* Eureka Improvements (automatic re-registration)
-* Ribbon Improvements (use standard Ribbon configuration)
-* Support for GraalVM 1.0 RC7
+The official GraalVM Docker images are used, so to build a native image you can simply execute `docker build . -t myimage` in the root of your project.
 
 === Support for GraalVM Native Images
 
@@ -103,7 +101,7 @@ The following dependency upgrades occurred in this release:
 - Reactor `3.1.8` -> `3.2.0`
 - SnakeYAML `1.20` -> `1.23`
 - Jaeger `0.30.4` -> `0.31.0`
-- Brave '5.2.0` -> `5.4.2`
+- Brave `5.2.0` -> `5.4.2`
 - Zipkin Reporter `2.7.7` -> `2.7.9`
 - Spring `5.0.8` -> `5.1.0`
 

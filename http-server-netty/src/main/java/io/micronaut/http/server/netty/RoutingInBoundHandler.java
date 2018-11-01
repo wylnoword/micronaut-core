@@ -596,6 +596,12 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         }
     }
 
+    private boolean isJsonFormattable(Class javaType) {
+        return !(javaType == byte[].class
+                || ByteBuffer.class.isAssignableFrom(javaType)
+                || ByteBuf.class.isAssignableFrom(javaType));
+    }
+
     private Subscriber<Object> buildSubscriber(NettyHttpRequest request,
                                                ChannelHandlerContext context,
                                                RouteMatch<?> finalRoute) {
@@ -906,17 +912,24 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
             boolean isStreaming = isReactiveReturnType && !isSingle;
 
+            Optional<Class<?>> javaPayloadType = genericReturnType.getFirstTypeVariable().map(arg -> arg.getType());
+
             if (!isStreaming) {
                 if (HttpResponse.class.isAssignableFrom(javaReturnType)) {
                     Optional<Argument<?>> generic = genericReturnType.getFirstTypeVariable();
                     if (generic.isPresent()) {
+                        // Unwrap response type information
                         Class genericType = generic.get().getType();
                         isStreaming = Publishers.isConvertibleToPublisher(genericType) && !Publishers.isSingle(genericType);
+
+                        if (isStreaming) {
+                            javaPayloadType = generic.get().getFirstTypeVariable().map(Argument::getType);
+                        }
                     }
                 }
             }
 
-
+            Class finalJavaPayloadType = javaPayloadType.orElse(Object.class);
             boolean finalIsStreaming = isStreaming;
             filteredPublisher  = filteredPublisher.switchMap((response) -> {
                 Optional<?> responseBody = response.getBody();
@@ -954,11 +967,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
                         applyConfiguredHeaders(response.getHeaders());
 
+                        boolean isJson = responseMediaType.getExtension().equals(MediaType.EXTENSION_JSON) &&
+                                isJsonFormattable(finalJavaPayloadType);
+
                         streamHttpContentChunkByChunk(
                                 context,
                                 request,
                                 nettyResponse,
                                 responseMediaType,
+                                isJson,
                                 bodyFlowable);
                     }
                 });
@@ -1094,8 +1111,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
         // default Connection header if not set explicitly
         if (!nettyHeaders.contains(HttpHeaderNames.CONNECTION)) {
+            boolean expectKeepAlive = nettyResponse.protocolVersion().isKeepAliveDefault() || httpRequest.getHeaders().isKeepAlive();
             HttpStatus status = nettyHttpResponse.status();
-            if (status.getCode() > 299 || !httpRequest.getHeaders().isKeepAlive()) {
+            if (!expectKeepAlive || status.getCode() > 299) {
                 nettyHeaders.add(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
             } else {
                 nettyHeaders.add(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
@@ -1329,10 +1347,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         NettyHttpRequest<?> request,
         FullHttpResponse nativeResponse,
         MediaType mediaType,
+        boolean isJson,
         Publisher<Object> publisher) {
 
         NettyByteBufferFactory byteBufferFactory = new NettyByteBufferFactory(context.alloc());
-        boolean isJson = mediaType.getExtension().equals(MediaType.EXTENSION_JSON);
 
         Publisher<HttpContent> httpContentPublisher = Publishers.map(publisher, new Function<Object, HttpContent>() {
             boolean first = true;
