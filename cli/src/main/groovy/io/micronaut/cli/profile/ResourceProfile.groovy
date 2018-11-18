@@ -34,7 +34,6 @@ class ResourceProfile extends AbstractProfile implements Profile {
         super(profileDir)
         super.name = name
         this.profileRepository = repository
-        initialize()
     }
 
     @Override

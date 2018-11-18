@@ -21,11 +21,12 @@ import groovy.transform.CompileStatic
 import groovy.transform.TypeCheckingMode
 import io.micronaut.cli.MicronautCli
 import io.micronaut.cli.config.features.AbstractFeature
-import io.micronaut.cli.config.profiles.AbstractProfile
+
 import io.micronaut.cli.console.logging.ConsoleAntBuilder
 import io.micronaut.cli.console.logging.MicronautConsole
 import io.micronaut.cli.io.IOUtils
 import io.micronaut.cli.io.support.*
+import io.micronaut.cli.profile.AbstractProfile
 import io.micronaut.cli.profile.Feature
 import io.micronaut.cli.profile.OneOfFeatureGroup
 import io.micronaut.cli.profile.Profile
@@ -387,10 +388,6 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
             MicronautConsole.instance.error("Profile not found for name [$profileName]")
             return false
         }
-        if (profileInstance.isAbstract()) {
-            MicronautConsole.instance.error("Profile [$profileName] is designed only for extension and not direct usage")
-            return false
-        }
         return true
     }
 
@@ -703,13 +700,6 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
 
         try {
             defaultpackagename = establishGroupAndAppName(groupAndAppName)
-
-            if (!NameUtils.isValidServiceId(appname)) {
-                MicronautConsole.instance.error("Application name should be all lower case and separated by underscores. For example: hello-world")
-                return false
-            } else {
-                return true
-            }
         } catch (IllegalArgumentException e) {
             MicronautConsole.instance.error(e.message)
             return false
@@ -746,7 +736,6 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
             groupname = parts[0..-2].join('.')
             defaultPackage = groupname
         }
-
         return defaultPackage
     }
 

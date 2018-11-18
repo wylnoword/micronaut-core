@@ -21,6 +21,7 @@ import groovy.transform.CompileStatic
 import io.micronaut.cli.MicronautCli
 import io.micronaut.cli.boot.DependencyVersions
 import io.micronaut.cli.console.logging.MicronautConsole
+import io.micronaut.cli.profile.AbstractProfile
 import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.util.VersionInfo
 import org.eclipse.aether.artifact.Artifact
@@ -41,6 +42,8 @@ import org.springframework.boot.cli.compiler.grape.DependencyResolutionFailedExc
 class MavenProfileRepository extends AbstractJarProfileRepository {
 
     public static final RepositoryConfiguration DEFAULT_REPO
+
+    private ServiceLoader<AbstractProfile> profileServiceLoader
 
     static {
         def version = VersionInfo.getVersion(MicronautCli)
@@ -75,6 +78,7 @@ class MavenProfileRepository extends AbstractJarProfileRepository {
         this.grapeEngine = AetherGrapeEngineFactory.create(classLoader, repositoryConfigurations, resolutionContext)
         profileDependencyVersions = new DependencyVersions(grapeEngine)
         resolutionContext.addDependencyManagement(profileDependencyVersions)
+        profileServiceLoader = ServiceLoader.load(AbstractProfile.class)
     }
 
     MavenProfileRepository() {
@@ -138,10 +142,19 @@ class MavenProfileRepository extends AbstractJarProfileRepository {
     }
 
     protected void processUrls() {
-        def urls = classLoader.getURLs()
-        for (URL url in urls) {
-            registerProfile(url, new URLClassLoader([url] as URL[], Thread.currentThread().contextClassLoader))
+        println "processUrls"
+
+        profileServiceLoader.iterator().each { profile ->
+
+            println profile.name
         }
+
+
+
+//        def urls = classLoader.getURLs()
+//        for (URL url in urls) {
+//            registerProfile(url, new URLClassLoader([url] as URL[], Thread.currentThread().contextClassLoader))
+//        }
     }
 
     @CompileDynamic

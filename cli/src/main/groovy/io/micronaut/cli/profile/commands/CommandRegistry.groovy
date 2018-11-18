@@ -84,12 +84,6 @@ class CommandRegistry {
 
         for (CommandFactory cf in registeredCommandFactories) {
             def factoryCommands = cf.findCommands(profile, inherited)
-            def condition = { Command c -> c.name == 'events' }
-            def eventCommands = factoryCommands.findAll(condition)
-            for (ec in eventCommands) {
-                ec.handle(new MicronautCli.ExecutionContextImpl(new CodeGenConfig(profile.configuration)))
-            }
-            factoryCommands.removeAll(condition)
             commands.addAll factoryCommands
         }
 

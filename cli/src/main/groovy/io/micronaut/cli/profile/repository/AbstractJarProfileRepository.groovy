@@ -119,7 +119,6 @@ abstract class AbstractJarProfileRepository implements ProfileRepository {
         JarProfile(ProfileRepository repository, Resource profileDir, ClassLoader classLoader) {
             super(profileDir, classLoader)
             this.profileRepository = repository
-            initialize()
         }
 
         @Override

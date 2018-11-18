@@ -1,0 +1,7 @@
+io.micronaut.cli.config.profiles.Base
+io.micronaut.cli.config.profiles.Cli
+io.micronaut.cli.config.profiles.Federation
+io.micronaut.cli.config.profiles.Function
+io.micronaut.cli.config.profiles.FunctionAws
+io.micronaut.cli.config.profiles.Kafka
+io.micronaut.cli.config.profiles.Service
