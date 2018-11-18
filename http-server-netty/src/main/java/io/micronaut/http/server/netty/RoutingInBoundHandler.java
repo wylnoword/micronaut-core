@@ -17,6 +17,7 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.context.BeanLocator;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
@@ -271,6 +272,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 Flowable<MutableHttpResponse<?>> routePublisher = buildRoutePublisher(
                         methodBasedRoute.getDeclaringType(),
                         methodBasedRoute.getReturnType().getType(),
+                        methodBasedRoute.getAnnotationMetadata(),
                         requestReference,
                         Flowable.just(response));
 
@@ -311,6 +313,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     Flowable<MutableHttpResponse<?>> routePublisher = buildRoutePublisher(
                             handler.getClass(),
                             result != null ? result.getClass() : HttpResponse.class,
+                            AnnotationMetadata.EMPTY_METADATA,
                             requestReference,
                             Flowable.just(response));
 
@@ -899,6 +902,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             routePublisher = buildRoutePublisher(
                     finalRoute.getDeclaringType(),
                     javaReturnType,
+                    finalRoute.getAnnotationMetadata(),
                     requestReference,
                     routePublisher
             );
@@ -989,6 +993,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     private Flowable<MutableHttpResponse<?>> buildRoutePublisher(
             Class<?> declaringType,
             Class<?> javaReturnType,
+            AnnotationMetadata annotationMetadata,
             AtomicReference<HttpRequest<?>> requestReference,
             Flowable<MutableHttpResponse<?>> routePublisher) {
         // In the case of an empty reactive type we switch handling so that
@@ -1030,7 +1035,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 }
             } else {
                 // void return type with no response, nothing else to do
-                response = HttpResponse.ok();
+                response = forStatus(annotationMetadata);
             }
             try {
                 emitter.onNext(response);
@@ -1125,9 +1130,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             nettyHeaders.add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
         }
 
-        Optional<NettyCustomizableResponseTypeHandlerInvoker> customizableTypeBody = message.getBody(NettyCustomizableResponseTypeHandlerInvoker.class);
-        if (customizableTypeBody.isPresent()) {
-            NettyCustomizableResponseTypeHandlerInvoker handler = customizableTypeBody.get();
+        final Object body = message.body();
+        if (body instanceof NettyCustomizableResponseTypeHandlerInvoker) {
+            NettyCustomizableResponseTypeHandlerInvoker handler = (NettyCustomizableResponseTypeHandlerInvoker) body;
             handler.invoke(httpRequest, nettyHttpResponse, context);
         } else {
             // close handled by HttpServerKeepAliveHandler
@@ -1142,17 +1147,23 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                                        MediaType mediaType,
                                                        ChannelHandlerContext context,
                                                        AtomicReference<HttpRequest<?>> requestReference) {
-        ByteBuf byteBuf = encodeBodyAsByteBuf(body, codec, context, requestReference);
-        int len = byteBuf.readableBytes();
-        MutableHttpHeaders headers = response.getHeaders();
-        if (!headers.contains(HttpHeaders.CONTENT_TYPE)) {
-            headers.add(HttpHeaderNames.CONTENT_TYPE, mediaType);
-        }
-        headers.remove(HttpHeaders.CONTENT_LENGTH);
-        headers.add(HttpHeaderNames.CONTENT_LENGTH, String.valueOf(len));
+        ByteBuf byteBuf;
+        try {
+            byteBuf = encodeBodyAsByteBuf(body, codec, context, requestReference);
+            int len = byteBuf.readableBytes();
+            MutableHttpHeaders headers = response.getHeaders();
+            if (!headers.contains(HttpHeaders.CONTENT_TYPE)) {
+                headers.add(HttpHeaderNames.CONTENT_TYPE, mediaType);
+            }
+            headers.remove(HttpHeaders.CONTENT_LENGTH);
+            headers.add(HttpHeaderNames.CONTENT_LENGTH, String.valueOf(len));
 
-        setBodyContent(response, byteBuf);
-        return response;
+            setBodyContent(response, byteBuf);
+            return response;
+        } catch (LinkageError e) {
+            // rxjava swallows linkage errors for some reasons so if one occurs, rethrow as a internal error
+            throw new InternalServerException("Fatal error encoding bytebuf: " + e.getMessage() , e);
+        }
     }
 
     private MutableHttpResponse<?> setBodyContent(MutableHttpResponse response, Object bodyContent) {
@@ -1247,7 +1258,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     return;
                 }
 
-                if (result == null || (result instanceof Optional && !((Optional) result).isPresent())) {
+                if (result instanceof Optional) {
+                    result = ((Optional<?>) result).orElse(null);
+                }
+
+                if (result == null) {
                     // empty flowable
                     emitter.onComplete();
                 } else {
@@ -1279,23 +1294,20 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             if (message instanceof HttpStatus) {
                 response = HttpResponse.status((HttpStatus) message);
             } else {
-                HttpStatus status = HttpStatus.OK;
-
-                if (finalRoute instanceof MethodBasedRouteMatch) {
-                    final MethodBasedRouteMatch rm = (MethodBasedRouteMatch) finalRoute;
-                    if (rm.hasAnnotation(Status.class)) {
-                        status = rm.getValue(Status.class, HttpStatus.class).orElse(null);
-                    }
-                }
-
-                if (status != null) {
-                    response = HttpResponse.status(status).body(message);
-                } else {
-                    response = HttpResponse.ok(message);
-                }
+                response = forStatus(finalRoute.getAnnotationMetadata()).body(message);
             }
         }
         return response;
+    }
+
+    private MutableHttpResponse<Object> forStatus(AnnotationMetadata annotationMetadata) {
+        HttpStatus status = HttpStatus.OK;
+
+        if (annotationMetadata.hasAnnotation(Status.class)) {
+            status = annotationMetadata.getValue(Status.class, HttpStatus.class).orElse(status);
+        }
+
+        return HttpResponse.status(status);
     }
 
     private boolean isResponsePublisher(ReturnType<?> genericReturnType, Class<?> javaReturnType) {

@@ -14,10 +14,25 @@
  * limitations under the License.
  */
 
+package io.micronaut.security.token.reader;
+
+import io.micronaut.http.HttpRequest;
+
+import java.util.Optional;
+
 /**
- * Classes for configuring transaction management for data sources.
+ * Returns the token from the provided request.
  *
- * @author graemerocher
- * @since 1.0
+ * @author Sergio del Amo
+ * @since 1.1.0
  */
-package io.micronaut.spring.tx.datasource;
+public interface TokenResolver {
+
+    /**
+     * Resolves the token from the provided request.
+     *
+     * @param request The HTTP request.
+     * @return The token in the supplied request. Empty if no token was found.
+     */
+    Optional<String> resolveToken(HttpRequest<?> request);
+}
