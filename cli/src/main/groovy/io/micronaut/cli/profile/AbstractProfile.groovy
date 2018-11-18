@@ -19,24 +19,17 @@ package io.micronaut.cli.profile
 import groovy.transform.CompileStatic
 import groovy.transform.ToString
 import groovy.transform.TypeCheckingMode
-import io.micronaut.cli.config.NavigableMap
-import io.micronaut.cli.console.parsing.ScriptNameResolver
 import io.micronaut.cli.interactive.completers.StringsCompleter
 import io.micronaut.cli.io.IOUtils
 import io.micronaut.cli.io.support.Resource
 import io.micronaut.cli.profile.commands.CommandRegistry
 
 import io.micronaut.cli.profile.commands.PicocliCompleter
-import io.micronaut.cli.profile.commands.script.GroovyScriptCommand
 import io.micronaut.cli.util.CliSettings
-import io.micronaut.cli.util.CosineSimilarity
 import io.micronaut.cli.util.VersionInfo
 import jline.console.completer.Completer
-import org.eclipse.aether.artifact.DefaultArtifact
 import org.eclipse.aether.graph.Dependency
-import org.eclipse.aether.graph.Exclusion
 import org.eclipse.aether.util.graph.selector.ExclusionDependencySelector
-import org.yaml.snakeyaml.Yaml
 import picocli.CommandLine
 
 /**
@@ -52,7 +45,6 @@ abstract class AbstractProfile implements Profile {
     protected String name
     protected List<Profile> parentProfiles
     protected Map<String, Command> commandsByName
-    protected NavigableMap navigableConfig
     protected ProfileRepository profileRepository
     protected List<Dependency> dependencies = []
     protected List<String> repositories = []
@@ -77,6 +69,11 @@ abstract class AbstractProfile implements Profile {
     protected String instructions = ""
     protected String version = VersionInfo.getVersion(CliSettings)
     protected Boolean abstractProfile = false
+
+
+    AbstractProfile() {
+
+    }
 
     AbstractProfile(Resource profileDir) {
         this(profileDir, AbstractProfile.getClassLoader())
@@ -109,126 +106,6 @@ abstract class AbstractProfile implements Profile {
 
     String getVersion() {
         return version
-    }
-
-    protected void initialize() {
-        def profileYml = profileDir.createRelative("profile.yml")
-        def profileConfig = (Map<String, Object>) new Yaml().loadAs(profileYml.getInputStream(), Map)
-
-        name = profileConfig.get("name")?.toString()
-        description = profileConfig.get("description")?.toString() ?: ''
-        instructions = profileConfig.get("instructions")?.toString() ?: ''
-        abstractProfile = Boolean.valueOf(profileConfig.get("abstract")?.toString() ?: '')
-
-        def parents = profileConfig.get("extends")
-        if (parents) {
-            parentNames = parents.toString().split(',').collect() { String name -> name.trim() }
-        }
-        if (this.name == null) {
-            throw new IllegalStateException("Profile name not set. Profile for path ${profileDir.URL} is invalid")
-        }
-        def map = new NavigableMap()
-        map.merge(profileConfig)
-        navigableConfig = map
-        def commandsByName = profileConfig.get("commands")
-        if (commandsByName instanceof Map) {
-            def commandsMap = (Map) commandsByName
-            for (clsName in commandsMap.keySet()) {
-                def fileName = commandsMap[clsName].toString()
-                if (fileName.endsWith(".groovy")) {
-                    GroovyScriptCommand cmd = (GroovyScriptCommand) classLoader.loadClass(clsName.toString()).newInstance()
-                    cmd.profile = this
-                    cmd.profileRepository = profileRepository
-                    internalCommands.add cmd
-                }
-            }
-        }
-
-        def featuresConfig = profileConfig.get("features")
-        if (featuresConfig instanceof Map) {
-            Map featureMap = (Map) featuresConfig
-            def featureList = (List) featureMap.get("provided") ?: Collections.emptyList()
-            def defaultFeatures = (List) featureMap.get("defaults") ?: Collections.emptyList()
-            def requiredFeatures = (List) featureMap.get("required") ?: Collections.emptyList()
-            def oneOfFeaturesMap = (Map) featureMap.get("oneOf") ?: Collections.emptyMap()
-            for (fn in featureList) {
-                def featureData = profileDir.createRelative("features/${fn}/feature.yml")
-                if (featureData.exists()) {
-                    def f = new DefaultFeature(this, fn.toString(), profileDir.createRelative("features/$fn/"))
-                    features.add f
-                }
-            }
-
-            for (Map.Entry<Object, Object> entry: oneOfFeaturesMap.entrySet()) {
-                List<Map> oneOfFeatures = []
-                def group = new OneOfFeatureGroup(name: entry.getKey().toString(), oneOfFeaturesData: oneOfFeatures)
-                if (entry.getValue() instanceof List) {
-                    for (feature in (List) entry.getValue()) {
-                        if (feature instanceof Map) {
-                            String name = (String) feature.feature
-                            Integer priority = (Integer) feature.priority
-
-                            oneOfFeatures.add([name: name, priority: priority])
-                        }
-                    }
-                }
-                oneOfFeatureGroups.add(group)
-            }
-
-
-            defaultFeaturesNames.addAll(defaultFeatures)
-            requiredFeatureNames.addAll(requiredFeatures)
-        }
-
-
-
-        def dependencyMap = profileConfig.get("dependencies")
-
-        if (dependencyMap instanceof List) {
-            List<Exclusion> exclusions = []
-
-            for (entry in ((List) dependencyMap)) {
-                if (entry instanceof Map) {
-                    def scope = (String) entry.scope
-                    String coords = (String) entry.coords
-
-                    if ("excludes".equals(scope)) {
-                        def artifact = new DefaultArtifact(coords)
-                        exclusions.add new Exclusion(artifact.groupId ?: null, artifact.artifactId ?: null, artifact.classifier ?: null, artifact.extension ?: null)
-                    } else {
-                        if (coords.count(':') == 1) {
-                            coords = "$coords:BOM"
-                        }
-                        Dependency dependency = new Dependency(new DefaultArtifact(coords), scope.toString())
-                        if (entry.containsKey('excludes')) {
-                            List<Exclusion> dependencyExclusions = new ArrayList<>()
-                            List excludes = (List) entry.excludes
-
-                            for (ex in excludes) {
-                                if (ex instanceof Map) {
-                                    dependencyExclusions.add(new Exclusion((String) ex.group, (String) ex.module, (String) ex.classifier, (String) ex.extension))
-                                }
-                            }
-                            dependency = dependency.setExclusions(dependencyExclusions)
-                        }
-                        dependencies.add(dependency)
-                    }
-                }
-
-                exclusionDependencySelector = new ExclusionDependencySelector(exclusions)
-            }
-        }
-
-        this.repositories = (List<String>) navigableConfig.get("repositories", [])
-        this.jvmArgs = (List<String>) navigableConfig.get("jvmArgs", [])
-        this.buildRepositories = (List<String>) navigableConfig.get("build.repositories", [])
-        this.buildPlugins = (List<String>) navigableConfig.get("build.plugins", [])
-        this.buildExcludes = (List<String>) navigableConfig.get("build.excludes", [])
-        this.buildMerge = (List<String>) navigableConfig.get("build.merge", null)
-        this.parentTargetFolder = (String) navigableConfig.get("skeleton.parent.target", null)
-        this.skeletonExcludes = (List<String>) navigableConfig.get("skeleton.excludes", [])
-        this.binaryExtensions = (List<String>) navigableConfig.get("skeleton.binaryExtensions", [])
-        this.executablePatterns = (List<String>) navigableConfig.get("skeleton.executable", [])
     }
 
     boolean isAbstract() {
@@ -390,12 +267,6 @@ abstract class AbstractProfile implements Profile {
         return profileDir
     }
 
-
-    @Override
-    NavigableMap getConfiguration() {
-        navigableConfig
-    }
-
     @Override
     Resource getTemplate(String path) {
         return profileDir.createRelative("templates/$path")
@@ -413,7 +284,7 @@ abstract class AbstractProfile implements Profile {
     }
 
     @Override
-    Iterable<Completer> getCompleters(io.micronaut.cli.profile.ProjectContext context) {
+    Iterable<Completer> getCompleters(ProjectContext context) {
         def commands = getCommands(context)
 
         Collection<Completer> completers = []
@@ -427,13 +298,13 @@ abstract class AbstractProfile implements Profile {
     }
 
     @Override
-    Command getCommand(io.micronaut.cli.profile.ProjectContext context, String name) {
+    Command getCommand(ProjectContext context, String name) {
         getCommands(context)
         return commandsByName[name]
     }
 
     @Override
-    Iterable<Command> getCommands(io.micronaut.cli.profile.ProjectContext context) {
+    Iterable<Command> getCommands(ProjectContext context) {
         if (commandsByName == null) {
             commandsByName = [:]
             List excludes = []
@@ -465,7 +336,6 @@ abstract class AbstractProfile implements Profile {
 
             def parents = getExtends()
             if (parents) {
-                excludes = (List) configuration.navigate("command", "excludes") ?: []
                 registerParentCommands(context, parents, registerCommand)
             }
         }
@@ -484,13 +354,13 @@ abstract class AbstractProfile implements Profile {
     }
 
     @Override
-    boolean hasCommand(io.micronaut.cli.profile.ProjectContext context, String name) {
+    boolean hasCommand(ProjectContext context, String name) {
         getCommands(context) // ensure initialization
         return commandsByName.containsKey(name)
     }
 
     @Override
-    boolean handleCommand(io.micronaut.cli.profile.ExecutionContext context) {
+    boolean handleCommand(ExecutionContext context) {
         def parseResult = context.parseResult
         while (parseResult.hasSubcommand()) { parseResult = parseResult.subcommand() }
         Command cmd = parseResult.commandSpec().userObject() as Command
@@ -513,5 +383,13 @@ abstract class AbstractProfile implements Profile {
 
     List<String> getSkeletonExcludes() {
         this.skeletonExcludes
+    }
+
+    List<String> getSkeletonExecutables() {
+        ["**/gradlew*", "**/mnw*", "**/mvnw*", "**/build-native-image*"]
+    }
+
+    List<String> getSkeletonBinaryExtensions() {
+        ['png','gif','jpg','jpeg','ico','icns','pdf','zip','jar','class']
     }
 }

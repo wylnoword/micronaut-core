@@ -109,11 +109,6 @@ public interface Profile {
     List<String> getJvmArgs();
 
     /**
-     * @return The profiles configuration
-     */
-    NavigableMap getConfiguration();
-
-    /**
      * @return The directory where the profile is located locally
      */
     Resource getProfileDir();

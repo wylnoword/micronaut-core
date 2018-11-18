@@ -4,10 +4,14 @@ import io.micronaut.cli.config.dependencies.Dependency
 import io.micronaut.cli.config.features.AbstractFeature
 import io.micronaut.cli.config.features.AnnotationApi
 import io.micronaut.cli.config.features.Java
+import io.micronaut.cli.profile.AbstractProfile
 
 
 class Base extends AbstractProfile {
-
+    @Override
+    String getName() {
+        "base"
+    }
 
     @Override
     String getDescription() {
@@ -22,16 +26,6 @@ class Base extends AbstractProfile {
     @Override
     Set<AbstractFeature> getRequiredFeatures() {
         [new AnnotationApi()]
-    }
-
-    @Override
-    List<String> getSkeletonExecutables() {
-        ["**/gradlew*", "**/mnw*", "**/mvnw*", "**/build-native-image*"]
-    }
-
-    @Override
-    List<String> getSkeletonBinaryExtensions() {
-        ['png','gif','jpg','jpeg','ico','icns','pdf','zip','jar','class']
     }
 
     @Override
@@ -59,7 +53,7 @@ class Base extends AbstractProfile {
     }
 
     @Override
-    Set<Dependency> getDependencies() {
+    List<Dependency> getDependencies() {
         [new Dependency("runtime", "ch.qos.logback:logback-classic:1.2.3")]
     }
 }
