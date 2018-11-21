@@ -1,6 +1,9 @@
 dependencies {
     compile project(":function")
+    compile project(":function-aws")
     compile "com.amazonaws:aws-lambda-java-core:${awsLambdaJavaCoreVersion}"
+    compile "com.amazon.alexa:ask-sdk:${alexaAskSdkVersion}"
 
     testCompile project(":inject-groovy")
+    testCompile project(":inject-java")
 }
