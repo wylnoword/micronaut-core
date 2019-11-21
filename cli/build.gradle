@@ -12,7 +12,7 @@ dependencies {
     compile dependencyModuleVersion("groovy", "groovy-xml")
     compile dependencyModuleVersion("groovy", "groovy-templates")
     compile "org.fusesource.jansi:jansi:1.14"
-    compile "jline:jline:2.12"
+    compile "jline:jline:2.14.6"
     compile "org.springframework.boot:spring-boot-cli:1.5.10.RELEASE"
     compile dependencyVersion("snakeyaml")
     runtime dependencyModuleVersion("slf4j", "slf4j-simple")
