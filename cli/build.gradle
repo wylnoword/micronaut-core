@@ -11,7 +11,7 @@ dependencies {
     compile dependencyModuleVersion("groovy", "groovy-jmx")
     compile dependencyModuleVersion("groovy", "groovy-xml")
     compile dependencyModuleVersion("groovy", "groovy-templates")
-    compile "org.fusesource.jansi:jansi:1.14"
+    compile "org.fusesource.jansi:jansi:1.18"
     compile "jline:jline:2.12"
     compile "org.springframework.boot:spring-boot-cli:1.5.10.RELEASE"
     compile dependencyVersion("snakeyaml")
